@@ -42,6 +42,7 @@ plt.show()
 ### DISCRIMINATOR ###
 # Given an input image, the Discriminator outputs the likelihood of the image being real
 # Binary classification - true (1) or false (0) - uses sigmoid activation
+# Have to downscale from high-resolution image (32x32) to a single decision
 def define_discriminator(in_shape=(32, 32, 3)):
   # in_shape defines the input shape, defaults to 32 x 32 pixel image with 3 color channels (RGB)
 
@@ -78,3 +79,44 @@ def define_discriminator(in_shape=(32, 32, 3)):
 
 test_discr = define_discriminator()
 print(test_discr.summary())
+
+### GENERATOR ###
+# Given input of latent vector, the Generator produces an image (32x32)
+# latent_dim, for example, can be 100, 1D array of size 100
+# Given latent_dim (1x100), have to upscale to 32x32x3 image
+
+def define_generator(latent_dim):
+  model = Sequential()
+
+  # We reshape the input latent vector into 8x8 image as a starting point, then upscale to 32x32 output
+  # 8x8x128 = 8192 nodes
+  n_nodes = 8 * 8 * 128
+  model.add(Dense(n_nodes, input_dim=latent_dim))
+  model.add(LeakyReLU(alpha=0.2))
+  # Reshape the list of 8,192 numbers into an image (8x8 pixels wide, 128 layers deep)
+  model.add(Reshape((8, 8, 128)))
+
+  # Adds a deconvolutional layer
+  # 128 filters, (4,4) kernel size
+  # In Conv2DTranspose, strides does the opposite of in Conv2D
+  # Instead of shrinking, it doubles (upsamples) the space between pixels and fills those gaps with new data
+  # Upsample to 16x16x128
+  model.add(Conv2DTranspose(128, (4,4), strides=(2,2), padding='same'))
+  model.add(LeakyReLU(alpha=0.2))
+
+  # Upsample to 32x32x128
+  model.add(Conv2DTranspose(128, (4,4), strides=(2,2), padding='same'))
+  model.add(LeakyReLU(alpha=0.2))
+
+  # Generate - output layer
+  # Need Conv2D because currently the 32x32 image is 128 layers deep, but a real image only has 3 layers
+  # tanh squishes all values to be between -1 and 1
+  model.add(Conv2D(3, (8,8), activation='tanh', padding='same'))
+
+  # We don't compile the model because it is not directly trained like the discriminator
+  # The Generator is trained via GAN combined model, which will be compiled later
+
+  return model
+
+test_gen = define_generator(100)
+print(test_gen.summary())
