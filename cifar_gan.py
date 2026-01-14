@@ -120,3 +120,77 @@ def define_generator(latent_dim):
 
 test_gen = define_generator(100)
 print(test_gen.summary())
+
+### GAN - COMBINED MODEL ###
+# Define the combined generator and discriminator model, for updating the generator ONLY
+
+def define_gan(generator, discriminator):
+  # Set discriminator to not trainable. It is trained separately
+  discriminator.trainable = False
+
+  # Connect generator and discriminator
+  # Give GAN model latent vector that goes into the Generator, which outputs a new image
+  # That image goes into the Discriminator, which outputs real or fake
+  model = Sequential()
+  model.add(generator)
+  model.add(discriminator)
+
+  # Compile model
+  opt = Adam(learning_rate=0.0002, beta_1=0.5)
+  model.compile(loss='binary_crossentropy', optimizer=opt)
+
+  return model
+
+### PREPARE TRAINING GAN ###
+# We will train the GAN on half-batch of real images and half-batch of fake images
+
+# Load CIFAR Training Images
+def load_real_samples():
+  (trainX, _), (_, _) = load_data()
+
+  # The pixels are originally stored as integers. Convert to float for math
+  X = trainX.astype('float32')
+
+  # Scale from [0, 255] to [-1, 1] to match the output of the Generator
+  X = (X - 127.5) / 127.5
+
+  return X
+
+# Pick a half_batch size of random REAL samples
+def generate_real_samples(dataset, n_samples):
+  # ix - list of random indices
+  # dataset.shape[0] - dataset size (60k)
+  # n_samples - how many we want to pick
+  ix = randint(0, dataset.shape[0], n_samples)
+
+  # X results in an array of the elements from the indices ix
+  X = dataset[ix]
+
+  # Generate class labels (answer key) and assign to y
+  # Since these are all real images from CIFAR, all 1
+  y = ones((n_samples, 1))
+
+  return X, y
+
+# Generates n_samples of latent vectors (size latent_dim) as input for the Generator
+def generate_latent_points(latent_dim, n_samples):
+  # Generate points in latent space
+  x_input = randn(latent_dim * n_samples)
+
+  # Reshape into a batch of inputs for the network
+  x_input = x_input.reshape(n_samples, latent_dim)
+
+  return x_input
+
+# Use the Generator to create n fake images, with class labels
+def generate_fake_samples(generator, latent_dim, n_samples):
+  # Generate points in latent space
+  x_input = generate_latent_points(latent_dim, n_samples)
+
+  # Use Generator to generate fake examples
+  X = generator.predict(x_input)
+
+  # Class labels are 0 as these samples are fake
+  y = zeros((n_samples, 1))
+
+  return X, y
