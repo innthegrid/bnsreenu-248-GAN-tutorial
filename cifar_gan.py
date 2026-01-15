@@ -194,3 +194,50 @@ def generate_fake_samples(generator, latent_dim, n_samples):
   y = zeros((n_samples, 1))
 
   return X, y
+
+### TRAINING ###
+# We loop through a number of epochs to train our model
+# Train the Discriminator by selecting a random batch of images from the real dataset
+# Then, generate a set of fake images with the Generator
+# Feed both sets into the Discriminator
+# Finally, set the loss parameters for both the real and fake images, and the combined loss
+
+def train(g_model, d_model, gan_model, dataset, latent_dim, n_epochs=100, n_batch=128):
+  # Batch per epoch
+  # = total number of real images / number of images in one batch
+  bat_per_epo = int(dataset.shape[0] / n_batch)
+  half_batch = int(n_batch / 2)
+
+  # Enumerate epochs
+  for i in n_epochs:
+    # Enumerate batches over the training set
+    for j in bat_per_epo:
+
+      ### TRAIN DISCRIMINATOR ###
+      # The discriminator is trained on half_batch of real images and half_batch fake images, separately
+      
+      # Randomly select real images
+      X_real, y_real = generate_real_samples(dataset, half_batch)
+      # Update discriminator model weights, capture loss and ignore accuracy
+      d_loss_real, _ = d_model.train_on_batch(X_real, y_real)
+
+      # Generate fake images
+      X_fake, y_fake = generate_fake_samples(g_model, latent_dim, half_batch)
+      # Update discriminator model weights
+      d_loss_fake, _ = d_model.train_on_batch(X_fake, y_fake)
+
+      ### TRAIN GENERATOR ###
+
+      # Prepare points in latent space as input for the generator
+      X_gan = generate_latent_points(latent_dim, n_batch)
+
+      # The generator is trying to trick the discriminator into believing the generated image is true (y = 1)
+      y_gan = ones((n_batch, 1))
+
+      # Update the Generator via the Discriminator's error (did G fool D)
+      g_loss = gan_model.train_on_batch(X_gan, y_gan)
+
+      print('Epoch>%d, Batch %d/%d, d1=%.3f, d2=%.3f g=%.3f' % (i+1, j+1, bat_per_epo, d_loss_real, d_loss_fake, g_loss))
+
+  # Save the generator model
+  g_model.save('cifar_generator_model.h5')
